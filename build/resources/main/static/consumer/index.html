@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Consumer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="container mt-4">
+    <h1 class="mb-3">Lagerhaus-Daten  warehouse</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <input type="text" id="locationFilter" class="form-control" placeholder="Nach Standort filtern...">
+        </div>
+        <div class="col-md-6">
+            <input type="text" id="productFilter" class="form-control" placeholder="Nach Produktnamen filtern...">
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table id="productTable" class="table table-striped table-hover">
+            <thead class="table-light">
+            <tr>
+                <th>Standort (Stadt)</th>
+                <th>Produkt-ID</th>
+                <th>Produktname</th>
+                <th>Kategorie</th>
+                <th>Menge</th>
+                <th>Einheit</th>
+            </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let combinedData = [];
+
+    // Funktion zum Abrufen der Daten von Ihrer API
+    async function fetchData() {
+        const warehouseIDs = ['001', '002', '003', '004'];
+        const fetchPromises = warehouseIDs.map(id =>
+            fetch(`http://localhost:8080/warehouse/${id}/json`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status} for ID ${id}`);
+                    }
+                    return response.json();
+                })
+        );
+
+        try {
+            const warehouseResults = await Promise.all(fetchPromises);
+
+            combinedData = warehouseResults.flatMap(warehouse =>
+                warehouse.productData.map(product => ({
+                    ...product,
+                    warehouseCity: warehouse.warehouseCity
+                }))
+            );
+
+            renderTable(combinedData);
+        } catch (error) {
+            console.error("Fehler beim Abrufen der Lagerdaten:", error);
+        }
+    }
+
+    // Funktion, um die Daten in die Tabelle zu schreiben
+    function renderTable(products) {
+        const tableBody = document.querySelector("#productTable tbody");
+        tableBody.innerHTML = "";
+
+        if (products.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6">
+                <div class="alert alert-info m-0">Keine passenden Produkte gefunden.</div>
+            </td></tr>`;
+            return;
+        }
+
+        products.forEach(product => {
+            const row = `<tr>
+                <td>${product.warehouseCity}</td>
+                <td>${product.productID}</td>
+                <td>${product.productName}</td>
+                <td>${product.productCategory}</td>
+                <td>${product.productQuantity}</td>
+                <td>${product.productUnit}</td>
+            </tr>`;
+            tableBody.innerHTML += row;
+        });
+    }
+
+    function applyFilters() {
+        const locationFilterValue = document.getElementById('locationFilter').value.toLowerCase();
+        const productFilterValue = document.getElementById('productFilter').value.toLowerCase();
+
+        const filteredData = combinedData.filter(product => {
+            const matchesLocation = product.warehouseCity.toLowerCase().includes(locationFilterValue);
+            const matchesProduct = product.productName.toLowerCase().includes(productFilterValue);
+            return matchesLocation && matchesProduct;
+        });
+
+        renderTable(filteredData);
+    }
+
+    document.getElementById('locationFilter').addEventListener('input', applyFilters);
+    document.getElementById('productFilter').addEventListener('input', applyFilters);
+
+    fetchData();
+</script>
+
+</body>
+</html>
